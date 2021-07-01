@@ -1,0 +1,59 @@
+﻿@model NopChatMessageModel
+@{
+    Layout = "";
+}
+<link href="~/Plugins/NopStation.NopChat/Contents/public.css" rel="stylesheet" />
+
+<div class="chat-with-vendor-panel">
+    <button id="chat-with-vendor-button" class="nopchatButton chat-with-vendor-button">Chat with Vendor</button>
+</div>
+
+
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script>
+    $(document).ready(function () {
+        var vendorId = $(".button-2").attr("onclick").replace('setLocation("/contactvendor/', '').replace('")', '');
+
+        $(".chat-with-vendor-button").click(function (e) {
+            e.preventDefault();
+            var vendorContact = $("#contact_" + vendorId).attr("data-id");
+            openChatBox();
+            if (vendorContact != null && vendorContact != "") {
+                $("#contact_" + vendorId).trigger("click");
+            }
+            else {
+                GetVendorInfo(vendorId);
+               /* $("#contact_" + vendorId).trigger("click");*/
+            }
+        });
+
+    });
+
+    function GetVendorInfo(vendorId) {
+        var postData = {
+            vendorId: parseInt(vendorId)
+        };
+        console.log(postData);
+        var postLink = "@(Url.Action("GetVendorById", "NopChat"))";
+
+       // postLink = postLink.replace("/WidgetsNopChat/GetVendorById", "/Admin/WidgetsNopChat/GetVendorById");
+
+        $.ajax({
+            cache: false,
+            type: "POST",
+            url: postLink,
+            data: postData,
+            //contentType: 'application/json; charset=utf-8',
+            success: function (data) {
+                console.log(data);
+                var html = prepareContactHtml(data.Result);
+                $(".contact-list").append(html);
+                $("#contact_" + vendorId).trigger("click");
+            },
+            error: function (request, status, error) {
+                console.log(error);
+            }
+        });
+    }
+</script>

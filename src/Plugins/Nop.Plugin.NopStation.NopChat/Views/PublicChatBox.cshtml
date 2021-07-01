@@ -1,0 +1,369 @@
+﻿@model NopChatMessageModel
+@{
+    Layout = "";
+    Html.AppendCssFileParts($"~/lib_npm/overlayscrollbars/css/OverlayScrollbars.min.css");
+    Html.AppendScriptParts(ResourceLocation.Footer, "~/lib_npm/overlayscrollbars/js/jquery.overlayScrollbars.min.js");
+}
+
+<link href="~/Plugins/NopStation.NopChat/Contents/PublicUI.css" rel="stylesheet" />
+
+<div class="nop-chat-wrapper">
+    <div class="nop-chat">
+        <div class="title">
+            <div class="chat-logo">
+                <img id="mainAvater" src="~/Plugins/NopStation.NopChat/Contents/Images/nopchat-logo.png" alt="Nop Chat">
+            </div>
+            <div class="buttons">
+                <button type="button" onclick="toggleChatBox()">_</button>
+                <button type="button" onclick="closeForm()">X</button>
+            </div>
+        </div>
+        <div class="chat-body">
+            <div class="contact-list">
+                @*<div class="contact unread">
+                        <div class="contact-picture">
+                            <div class="picture">
+                                <img src="~/images/samples/category_apparel.jpeg" />
+                            </div>
+                        </div>
+                        <div class="contact-body">
+                            <div class="name">
+                                adiba
+                            </div>
+                            <div class="message-preview">
+                                adiba sent you a message
+                            </div>
+                        </div>
+                    </div>*@
+            </div>
+            <div class="chat-box">
+                @*<input type="hidden" id="hdCustomerId" />*@
+                <input type="hidden" id="hdVendorId" />
+                <div class="messages" id="msg_history">
+
+                </div>
+                <div class="text-box">
+                    <input type="text" id="txtText" placeholder="Write a message..." />
+                    <div class="send-button">
+                        <button type="button" onclick="SendMessage()">Send</button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <div class="open-chat">
+        <button type="button">Open Chat</button>
+    </div>
+</div>
+<script src="~/Plugins/NopStation.NopChat/Scripts/signalr.js"></script>
+<script asp-location="Footer">
+    var CustomerId = @Model.CustomerId;
+
+    var contactList = JSON.parse('@Html.Raw(Json.Serialize(Model.ContactList))');
+
+    var chatHistoryGlobal = [];
+
+
+    $(document).ready(function () {
+
+        var connection = new signalR.HubConnectionBuilder()
+            .withUrl('/nopChatHub')
+            .build();
+        connection.serverTimeoutInMilliseconds = 100000; // 100 second
+
+        connection.on('NewMessagesHub', res => {
+            console.log(res);
+            appenedReceivedMessage(res.message);
+
+        });
+
+        function start() {
+            connection.start()
+                .then(function () {
+                    console.log("Connected");
+                    //connection.invoke('setconnection');
+                })
+                .catch(function (err) {
+                    console.log(err);
+                    setTimeout(function () {
+                        start();
+                    }, 10000);
+                });
+        }
+
+        connection.onclose(function () {
+            start();
+            console.log("SignalR connection clossed.");
+        });
+
+        start();
+
+        //******************SignalR End************************
+
+         applyOverLayScrollBars();
+        //$('.nop-chat .contact-list').overlayScrollbars({});
+        //$('.nop-chat .messages').overlayScrollbars({});
+
+        $('.nop-chat-wrapper .open-chat').on('click', function () {
+            //$('.nop-chat-wrapper .nop-chat').slideToggle('fast');
+            toggleChatBox();
+        });
+
+        //******************Public UI design code End************************
+
+        //$(".chat-with-vendor-button").click(function (e) {
+        //    e.preventDefault();
+        //    openForm();
+        //});
+        renderContactList(contactList);
+
+        //$(document).delegate('.chat_list', 'click', function (e) {
+        $(document).delegate('.contact', 'click', function (e) {
+            e.preventDefault();
+
+            var chatHistory;
+
+            var vendorId = parseInt($(this).attr("data-id"));
+
+            chatHistory = chatHistoryGlobal["contact_" + vendorId];
+            activateContact("contact_" + vendorId);
+
+            if (chatHistory != null) {
+                renderChatBox(chatHistory);
+            }
+            else {
+                GetChatHistory(CustomerId, vendorId);
+            }
+            removeNewMessageIndication(vendorId);
+
+        });
+    });
+    function renderContactList(contactList) {
+        console.log(contactList);
+        var html = '';
+        $.each(contactList, function (index, value) {
+            html += prepareContactHtml(value);
+        });
+        $(".contact-list").html(html);
+    }
+    function prepareContactHtml(value) {
+        var html = "";
+        html += '<div class="contact" style="cursor: pointer;" id="contact_' + value.Id + '" data-id="' + value.Id + '">';
+            html += '<div class="contact-picture">';
+                html += '<div class="picture">';
+                    html += '<img src="/images/samples/category_apparel.jpeg" />';
+                html += '</div>';
+            html += '</div>';
+            html += '<div class="contact-body">';
+        html += '<div class="name">' + value.Name + ' <span id="chatNotification_' + value.Id + '"</div>';
+                //html += '<div class="message-preview">Lorem Ipsum</div>';
+            html += '</div>';
+        html += '</div>';
+
+        return html;
+    }
+    function applyOverLayScrollBars() {
+        $('.nop-chat .contact-list').overlayScrollbars({});
+        $('.nop-chat .messages').overlayScrollbars({});
+    }
+    function toggleChatBox() {
+        $('.nop-chat-wrapper .nop-chat').slideToggle('fast');
+        $('.nop-chat-wrapper .open-chat').toggle();
+    }
+    function openChatBox() {
+        $('.nop-chat-wrapper .nop-chat').show();
+        $('.nop-chat-wrapper .open-chat').hide();
+    }
+    function closeForm() {
+        $('.nop-chat-wrapper .nop-chat').hide();
+        $('.nop-chat-wrapper .open-chat').hide();
+    }
+    function GetChatHistory(customerId, vendorId) {
+            var postData = {
+                customerId: customerId,
+                vendorId: vendorId
+            };
+            console.log(postData);
+
+            var postLink = "@(Url.Action("GetChatHistory", "NopChat"))";
+
+           // postLink = postLink.replace("/WidgetsNopChat/GetChatHistory", "/Admin/WidgetsNopChat/GetChatHistory");
+
+
+            $.ajax({
+            cache: false,
+            type: "POST",
+            url: postLink,
+            data: postData,
+            //contentType: 'application/json; charset=utf-8',
+            success: function (data) {
+                console.log(data);
+                renderChatBox(data.Result);
+                chatHistoryGlobal["contact_" + vendorId] = data.Result;
+                //$("#hdCustomerId").val(customerId);
+                $("#hdVendorId").val(vendorId);
+            },
+            error: function (request, status, error) {
+                console.log(error);
+            }
+        });
+    }
+    function renderChatBox(data) {
+        var messageListHtml = "";
+        $.each(data, function (index, value) {
+            if (value.IsVendorResponse == true) {
+                messageListHtml += prepareReceivedMessage(value);
+            }
+            else {
+                messageListHtml += prepareSentMessage(value);
+            }
+        });
+        $(".os-content").html(messageListHtml);
+    }
+    function prepareReceivedMessage(value) {
+        var messageListHtml = "";
+        messageListHtml += '<div class="message">';
+            messageListHtml += '<div class="message-picture">';
+                messageListHtml += '<div class="picture">';
+                    messageListHtml += '<img src="/images/samples/category_apparel_accessories.jpg" />';
+                messageListHtml += '</div>';
+            messageListHtml += '</div>';
+            messageListHtml += '<div class="message-content">';
+        messageListHtml += '<div class="text">' + value.Text + '</div>';
+        messageListHtml += '<div class="time-stamp">' + value.DateCreated + '</div>';
+            messageListHtml += '</div>';
+        messageListHtml += '</div>';
+
+        return messageListHtml;
+    }
+    function prepareSentMessage(value) {
+        var messageListHtml = "";
+
+        messageListHtml += '<div class="message self">';
+        messageListHtml += '<div class="message-picture">';
+        messageListHtml += '<div class="picture">';
+        messageListHtml += '<img src="/images/samples/category_apparel_accessories.jpg" />';
+        messageListHtml += '</div>';
+        messageListHtml += '</div>';
+        messageListHtml += '<div class="message-content">';
+        messageListHtml += '<div class="text">' + value.Text + '</div>';
+        messageListHtml += '<div class="time-stamp">' + value.DateCreated + '</div>';
+        messageListHtml += '</div>';
+        messageListHtml += '</div>';
+
+        return messageListHtml;
+    }
+    function SendMessage() {
+        var text = $("#txtText").val();
+        var vendorId = $("#hdVendorId").val();
+
+        var postData = {
+            Text: text,
+            CustomerId: CustomerId,
+            VendorId: vendorId,
+            IsVendorResponse: false
+
+        };
+        console.log(postData);
+
+        var postLink = "@(Url.Action("SendMessage", "NopChat"))";
+
+       // postLink = postLink.replace("/WidgetsNopChat/SendMessage", "/Admin/WidgetsNopChat/SendMessage");
+
+        $.ajax({
+            cache: false,
+            type: "POST",
+            url: postLink,
+            data: postData,
+            success: function (data) {
+                console.log(data);
+                if (data.Result == true) {
+                    $("#txtText").val("");
+
+                    chatHistoryGlobal["contact_" + vendorId].push(data.Message);
+                    $("#contact_" + vendorId).trigger("click");
+                }
+                else {
+                    alert("Message could not be sent!");
+                }
+            },
+            error: function (request, status, error) {
+                console.log(error);
+            }
+        });
+    }
+    function updateScroll() {
+        $('#msg_history').scrollTop($('#msg_history')[0].scrollHeight);
+    }
+    function activateContact(chat_list_Id) {
+        $(".contact").removeClass("active_chat");
+        $("#" + chat_list_Id).addClass("active_chat");
+    }
+
+    function appenedReceivedMessage(message) {
+        var vendorId = $("#hdVendorId").val();
+        console.log("c : " + CustomerId + " & v : " + vendorId);
+        var newMessage = {
+            Text: message.text,
+            DateCreated: message.dateCreated,
+            CustomerId: message.customerId,
+            CustomerName: message.customerName,
+            VendorId: message.vendorId,
+            VendorName: message.vendorName,
+            IsChecked: message.isChecked,
+            IsVendorResponse: message.isVendorResponse
+        };
+
+        var ContactId = message.vendorId;
+        //alert("Vendor : " + vendorId + " == " + message.vendorId);
+        if (vendorId == message.vendorId) {
+            var messageListHtml = prepareReceivedMessage(newMessage);
+            $(".os-content").append(messageListHtml);
+
+            ContactId = message.vendorId;
+        }
+
+        var isListed = isListedContact(ContactId);
+        if (isListed == true) {
+            if (chatHistoryGlobal["contact_" + ContactId] != null) {
+                chatHistoryGlobal["contact_" + ContactId].push(newMessage);
+            }
+        }
+        else {
+            var newContact = {
+                Id: ContactId,
+                Name: message.VendorName,
+                LastMesageDate: "",
+                NumberOfMessage: 0
+            }
+            var newMessageList = [];
+            newMessageList.push(newMessage);
+            chatHistoryGlobal["contact_" + ContactId] = newMessageList;
+            contactList.push(newContact);
+            renderContactList(contactList);
+        }
+        if (customerId == "" && vendorId == "") {
+            indicateNewMessage(ContactId);
+        }
+    }
+    function appenedSentMessage(message) {
+        var messageListHtml = prepareSentMessage(message);
+        $(".os-content").append(messageListHtml);
+    }
+    function isListedContact(contactId) {
+        var id = $("#contact_" + contactId).attr("data-id");
+        if (id != null)
+            return true;
+
+        return false;
+    }
+    function indicateNewMessage(ContactId) {
+
+        $("#contact_" + ContactId).addClass('unread');
+    }
+    function removeNewMessageIndication(ContactId) {
+        $("#contact_" + ContactId).removeClass('unread');
+    }
+</script>

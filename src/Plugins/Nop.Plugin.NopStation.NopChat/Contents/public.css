@@ -1,0 +1,32 @@
+﻿
+.chat-with-vendor-panel {
+  display: inline-block;
+  position: relative;
+  float: left;
+}
+.nopchatButton {
+  border: none;
+  background-color: #8FDEE4;
+  padding: 10px 25px;
+  text-align: center;
+  font-size: 15px;
+  color: #fff;
+  text-transform: uppercase;
+}
+
+  .nopchatButton:hover,
+  .nopchatButton:focus {
+    background-color: #8ABFE6;
+  }
+
+
+.chat-with-vendor-button {
+    margin:0 1px;
+  height: 37px;
+  border: none;
+  background-color: #4ab2f1;
+  padding: 0 24px;
+  font-size: 15px;
+  color: #fff;
+  text-transform: uppercase;
+}
